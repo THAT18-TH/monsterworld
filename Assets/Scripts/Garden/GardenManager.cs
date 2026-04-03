@@ -57,7 +57,6 @@ namespace MonsterWorldLike.Garden
 
         private readonly List<PlotState> plots = new();
         private readonly List<GameObject> plotVisuals = new();
-        private readonly Dictionary<int, GameObject> plotVisualsByPlotId = new();
         private readonly Dictionary<string, int> seedInventory = new();
         private readonly List<DecorationPlacement> placedDecorations = new();
         private readonly List<QuestState> activeQuests = new();
@@ -87,15 +86,10 @@ namespace MonsterWorldLike.Garden
                 return;
             }
 
-            plotVisuals.Clear();
-            plotVisualsByPlotId.Clear();
             for (var i = 0; i < totalPlots; i++)
             {
-                var plotVisual = Instantiate(plotPrefab, new Vector3(i * 0.6f, 0, 0), Quaternion.identity, transform);
-                plotVisual.transform.localScale = new Vector3(0.5f, 0.5f, 1f);
+                var plotVisual = Instantiate(plotPrefab, new Vector3(i * 2.5f, 0, 0), Quaternion.identity, transform);
                 plotVisuals.Add(plotVisual);
-                plotVisualsByPlotId[i] = plotVisual;
-                UpdatePlotVisual(i);
             }
         }
 
@@ -281,7 +275,6 @@ namespace MonsterWorldLike.Garden
             plot.harvestsRemaining = Mathf.Max(1, plant.harvestCount);
 
             GameEvents.SeedPlanted(plotId, plant.plantId);
-            UpdatePlotVisual(plotId);
             OnGardenChanged?.Invoke();
             SaveManager.MarkDirty();
             return true;
@@ -331,7 +324,6 @@ namespace MonsterWorldLike.Garden
                 plot.needsWater = true;
             }
 
-            UpdatePlotVisual(plotId);
             OnGardenChanged?.Invoke();
             SaveManager.MarkDirty();
             return true;
@@ -347,7 +339,6 @@ namespace MonsterWorldLike.Garden
 
             plot.needsWater = false;
             GameEvents.PlotWatered(plotId);
-            UpdatePlotVisual(plotId);
             OnGardenChanged?.Invoke();
             SaveManager.MarkDirty();
             return true;
@@ -370,7 +361,6 @@ namespace MonsterWorldLike.Garden
             economy.SetBalances(economy.Gold, economy.Gems, economy.Food - reviveFoodCost);
             plot.withered = false;
             plot.needsWater = true;
-            UpdatePlotVisual(plotId);
             OnGardenChanged?.Invoke();
             SaveManager.MarkDirty();
             return true;
@@ -398,7 +388,6 @@ namespace MonsterWorldLike.Garden
 
             plot.unlocked = true;
             plot.ClearPlant();
-            UpdatePlotVisual(plotId);
             OnGardenChanged?.Invoke();
             SaveManager.MarkDirty();
             return true;
@@ -604,57 +593,7 @@ namespace MonsterWorldLike.Garden
                 EnsureStarterQuests();
             }
 
-            for (var i = 0; i < plots.Count; i++)
-            {
-                UpdatePlotVisual(plots[i].plotId);
-            }
             OnGardenChanged?.Invoke();
-        }
-
-        public void UpdatePlotVisual(int plotId)
-        {
-            if (!plotVisualsByPlotId.TryGetValue(plotId, out var plotVisual) || plotVisual == null)
-            {
-                return;
-            }
-
-            var plot = GetPlotById(plotId);
-            if (plot == null)
-            {
-                return;
-            }
-
-            var spriteRenderer = plotVisual.GetComponentInChildren<SpriteRenderer>();
-            if (spriteRenderer == null)
-            {
-                return;
-            }
-
-            var now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
-            if (!plot.unlocked)
-            {
-                spriteRenderer.color = new Color(0.3f, 0.3f, 0.3f, 1f);
-            }
-            else if (plot.withered)
-            {
-                spriteRenderer.color = new Color(0.45f, 0.25f, 0.2f, 1f);
-            }
-            else if (plot.IsEmpty)
-            {
-                spriteRenderer.color = Color.white;
-            }
-            else if (plot.needsWater)
-            {
-                spriteRenderer.color = new Color(0.55f, 0.75f, 1f, 1f);
-            }
-            else if (plot.IsReadyToHarvest(now))
-            {
-                spriteRenderer.color = new Color(0.5f, 1f, 0.5f, 1f);
-            }
-            else
-            {
-                spriteRenderer.color = new Color(1f, 0.95f, 0.65f, 1f);
-            }
         }
 
         private PlotState GetPlotById(int plotId)
@@ -720,7 +659,6 @@ namespace MonsterWorldLike.Garden
             if (plot.needsWater && now > plot.readyAtUnix + witherGraceSeconds)
             {
                 plot.withered = true;
-                UpdatePlotVisual(plot.plotId);
             }
         }
 
