@@ -46,7 +46,13 @@ namespace MonsterWorldLike.Garden
         [SerializeField, Min(1)] private int unlockPlotMinLevel = 1;
         [SerializeField, Min(1)] private int reviveFoodCost = 20;
         [SerializeField, Min(1)] private int witherGraceSeconds = 1800;
-        [SerializeField] private GameObject plotPrefab;
+        [SerializeField] private GameObject plotVisualPrefab;
+        [SerializeField] private Transform plotRoot;
+        [SerializeField] private Vector3 plotStartPosition = Vector3.zero;
+        [SerializeField, Min(1)] private int plotColumns = 3;
+        [SerializeField, Min(1)] private int plotRows = 2;
+        [SerializeField, Min(0.1f)] private float plotSpacingX = 1.1f;
+        [SerializeField, Min(0.1f)] private float plotSpacingY = 0.8f;
 
         [Header("Plants")]
         [SerializeField] private List<PlantDefinition> plantCatalog = new();
@@ -57,6 +63,7 @@ namespace MonsterWorldLike.Garden
 
         private readonly List<PlotState> plots = new();
         private readonly List<GameObject> plotVisuals = new();
+        private readonly Dictionary<int, PlotVisualController> plotVisualControllersById = new();
         private readonly Dictionary<string, int> seedInventory = new();
         private readonly List<DecorationPlacement> placedDecorations = new();
         private readonly List<QuestState> activeQuests = new();
@@ -81,15 +88,55 @@ namespace MonsterWorldLike.Garden
 
         private void Start()
         {
-            if (plotPrefab == null)
+            RebuildPlotVisuals();
+        }
+
+        public void RebuildPlotVisuals()
+        {
+            for (var i = 0; i < plotVisuals.Count; i++)
+            {
+                if (plotVisuals[i] != null)
+                {
+                    Destroy(plotVisuals[i]);
+                }
+            }
+
+            plotVisuals.Clear();
+            plotVisualControllersById.Clear();
+
+            if (plotVisualPrefab == null)
             {
                 return;
             }
 
-            for (var i = 0; i < totalPlots; i++)
+            var root = plotRoot != null ? plotRoot : transform;
+            var count = totalPlots;
+            for (var i = 0; i < count; i++)
             {
-                var plotVisual = Instantiate(plotPrefab, new Vector3(i * 2.5f, 0, 0), Quaternion.identity, transform);
+                var col = i % Mathf.Max(1, plotColumns);
+                var row = i / Mathf.Max(1, plotColumns);
+                if (row >= Mathf.Max(1, plotRows) && i == Mathf.Max(1, plotColumns) * Mathf.Max(1, plotRows))
+                {
+                    Debug.LogWarning("GardenManager: totalPlots excede plotColumns*plotRows; se continuará en filas adicionales.");
+                }
+                var pos = plotStartPosition + new Vector3(col * plotSpacingX, -row * plotSpacingY, 0f);
+                var plotVisual = Instantiate(plotVisualPrefab, pos, Quaternion.identity, root);
                 plotVisuals.Add(plotVisual);
+
+                var plotId = i;
+                if (i < plots.Count && plots[i] != null)
+                {
+                    plotId = plots[i].plotId;
+                }
+
+                var controller = plotVisual.GetComponent<PlotVisualController>();
+                if (controller == null)
+                {
+                    controller = plotVisual.AddComponent<PlotVisualController>();
+                }
+
+                controller.Bind(this, plotId);
+                plotVisualControllersById[plotId] = controller;
             }
         }
 
@@ -107,6 +154,12 @@ namespace MonsterWorldLike.Garden
         public IReadOnlyList<QuestState> GetActiveQuests() => activeQuests;
 
         public IReadOnlyList<DecorationPlacement> GetPlacedDecorations() => placedDecorations;
+
+        public bool TryGetPlot(int plotId, out PlotState plot)
+        {
+            plot = GetPlotById(plotId);
+            return plot != null;
+        }
 
         public bool IsPlantAllowedInCurrentArea(PlantDefinition plant)
         {
@@ -593,7 +646,39 @@ namespace MonsterWorldLike.Garden
                 EnsureStarterQuests();
             }
 
+            RebuildPlotVisuals();
             OnGardenChanged?.Invoke();
+        }
+
+        public bool TryPerformPrimaryAction(int plotId, PlantDefinition defaultPlant = null)
+        {
+            var plot = GetPlotById(plotId);
+            if (plot == null)
+            {
+                return false;
+            }
+
+            if (!plot.unlocked)
+            {
+                return UnlockPlot(plotId);
+            }
+
+            if (plot.withered)
+            {
+                return RevivePlot(plotId);
+            }
+
+            if (plot.needsWater)
+            {
+                return Water(plotId);
+            }
+
+            if (plot.IsEmpty)
+            {
+                return defaultPlant != null && PlantSeed(plotId, defaultPlant);
+            }
+
+            return Harvest(plotId);
         }
 
         private PlotState GetPlotById(int plotId)

@@ -4,16 +4,33 @@ namespace MonsterWorldLike.World
 {
     public class IsometricCameraController : MonoBehaviour
     {
+        [Header("Enable/Disable")]
+        [SerializeField] private bool enablePan = true;
+        [SerializeField] private bool enableZoom = true;
+
+        [Header("Pan")]
         [SerializeField] private float panSpeed = 8f;
+
+        [Header("Zoom")]
         [SerializeField] private float zoomSpeed = 2f;
         [SerializeField] private float minSize = 3f;
         [SerializeField] private float maxSize = 12f;
+
+        [Header("World Limits")]
+        [SerializeField] private bool clampPosition = true;
+        [SerializeField] private Vector2 limitX = new(-10f, 10f);
+        [SerializeField] private Vector2 limitY = new(-10f, 10f);
+        [SerializeField] private float defaultOrthographicSize = 6f;
 
         private Camera cam;
 
         private void Awake()
         {
             cam = Camera.main;
+            if (cam != null)
+            {
+                cam.orthographicSize = Mathf.Clamp(defaultOrthographicSize, minSize, maxSize);
+            }
         }
 
         private void Update()
@@ -24,6 +41,11 @@ namespace MonsterWorldLike.World
 
         private void HandlePan()
         {
+            if (!enablePan)
+            {
+                return;
+            }
+
             if (Input.touchCount != 1)
             {
                 return;
@@ -38,10 +60,22 @@ namespace MonsterWorldLike.World
             var delta = touch.deltaPosition;
             var move = new Vector3(-delta.x, 0f, -delta.y) * (panSpeed * Time.deltaTime * 0.01f);
             transform.Translate(move, Space.World);
+            if (clampPosition)
+            {
+                var pos = transform.position;
+                pos.x = Mathf.Clamp(pos.x, Mathf.Min(limitX.x, limitX.y), Mathf.Max(limitX.x, limitX.y));
+                pos.y = Mathf.Clamp(pos.y, Mathf.Min(limitY.x, limitY.y), Mathf.Max(limitY.x, limitY.y));
+                transform.position = pos;
+            }
         }
 
         private void HandleZoom()
         {
+            if (!enableZoom)
+            {
+                return;
+            }
+
             if (cam == null || Input.touchCount != 2)
             {
                 return;

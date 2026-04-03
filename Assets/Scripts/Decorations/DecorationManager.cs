@@ -10,6 +10,8 @@ namespace MonsterWorldLike.Decorations
 {
     public class DecorationManager : MonoBehaviour
     {
+        public static DecorationManager Instance { get; private set; }
+
         [SerializeField] private List<DecorationDefinition> catalog = new();
         [SerializeField] private Material ghostMaterial;
         [SerializeField, Min(0.1f)] private float gridSize = 1f;
@@ -32,6 +34,13 @@ namespace MonsterWorldLike.Decorations
 
         private void Awake()
         {
+            if (Instance != null && Instance != this)
+            {
+                Destroy(gameObject);
+                return;
+            }
+
+            Instance = this;
             RebuildLookup();
         }
 
@@ -55,7 +64,16 @@ namespace MonsterWorldLike.Decorations
             DestroyGhost();
         }
 
+        private void OnDestroy()
+        {
+            if (Instance == this)
+            {
+                Instance = null;
+            }
+        }
+
         public IReadOnlyList<DecorationDefinition> GetCatalog() => catalog;
+        public bool IsPlacementActive => selected != null && ghost != null;
 
         public void BeginPlacement(DecorationDefinition definition)
         {

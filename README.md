@@ -28,6 +28,7 @@ Base de **garden sim + workers** para Android/Unity, con persistencia local y ar
 - `EconomyManager`: `Gold`, `Gems`, `Food`.
 - `ProgressionManager`: `Level`, `XP`.
 - `GardenManager`: parcelas, semillas, plantar/regar/cosechar, regrow/multi-harvest base, validación de plantas por bioma y bonus de venta por área, quests legacy, decoraciones persistidas.
+- `GardenManager`: layout visual de parcelas configurable (grid compacto) + soporte de interacción directa por `PlotVisualController`.
 - `MonsterManager`: workers, roles, energía/felicidad, offline production.
 - `InventoryManager`: inventario transversal.
 - `BuildingManager`: compra/colocación/construcción.
@@ -131,6 +132,27 @@ Corrección relevante: decoraciones guardadas con `plotId = -1` ahora se restaur
 
 - `ToastNotifier`
   - `toastText` (`TMP_Text`)
+
+### Prefab visual de parcela (nuevo flujo recomendado)
+
+1. Crear prefab `PlotVisual` con:
+   - `SpriteRenderer` para suelo.
+   - `Collider2D` (ej. `BoxCollider2D`) para click/tap.
+   - `PlotVisualController`.
+   - (Opcional) child vacío `CropVisualRoot`.
+2. En `GardenManager` configurar:
+   - `plotVisualPrefab` -> prefab `PlotVisual`.
+   - `plotRoot` -> transform contenedor (opcional).
+   - `plotStartPosition` -> esquina superior izquierda del bloque.
+   - `plotColumns`, `plotRows` -> por ejemplo 3x2.
+   - `plotSpacingX`, `plotSpacingY` -> separación horizontal/vertical.
+3. En `PlotVisualController` del prefab:
+   - `groundRenderer` -> sprite del suelo.
+   - `cropVisualRoot` -> root de cultivo (opcional).
+   - `plotCollider2D` -> collider del tile.
+   - `defaultPlant` -> planta por defecto para acción contextual de plantar.
+   - `plantVisuals` -> mapeo `plantId -> prefab` (opcional).
+   - `fallbackCropPrefab` -> visual genérico si no hay mapeo específico.
 
 > Este repositorio no incluye escenas/prefabs versionados; el wiring de inspector se hace manualmente en Unity.
 
