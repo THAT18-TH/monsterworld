@@ -46,6 +46,7 @@ namespace MonsterWorldLike.Garden
         [SerializeField, Min(1)] private int unlockPlotMinLevel = 1;
         [SerializeField, Min(1)] private int reviveFoodCost = 20;
         [SerializeField, Min(1)] private int witherGraceSeconds = 1800;
+        [SerializeField] private GameObject plotPrefab;
 
         [Header("Plants")]
         [SerializeField] private List<PlantDefinition> plantCatalog = new();
@@ -55,6 +56,7 @@ namespace MonsterWorldLike.Garden
         [SerializeField] private List<QuestState> starterQuests = new();
 
         private readonly List<PlotState> plots = new();
+        private readonly List<GameObject> plotVisuals = new();
         private readonly Dictionary<string, int> seedInventory = new();
         private readonly List<DecorationPlacement> placedDecorations = new();
         private readonly List<QuestState> activeQuests = new();
@@ -75,6 +77,20 @@ namespace MonsterWorldLike.Garden
             EnsureDefaultGarden();
             EnsureStarterQuests();
             InstanceReady?.Invoke();
+        }
+
+        private void Start()
+        {
+            if (plotPrefab == null)
+            {
+                return;
+            }
+
+            for (var i = 0; i < totalPlots; i++)
+            {
+                var plotVisual = Instantiate(plotPrefab, new Vector3(i * 2.5f, 0, 0), Quaternion.identity, transform);
+                plotVisuals.Add(plotVisual);
+            }
         }
 
         private void OnDestroy()
