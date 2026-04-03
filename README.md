@@ -7,12 +7,13 @@ Starter 2D isométrico enfocado en **garden sim** (sembrar -> crecer -> cosechar
 - `GameManager`: ciclo de vida global, autosave, save en pause/focus/quit y apply diferido de datos cargados.
 - `SaveManager`: persistencia JSON local en `Application.persistentDataPath/savegame.json` con dirty-flag y dos fases (leer disco / aplicar a escena).
 - `EconomyManager`: monedas (`Gold`, `Gems`, `Food`).
-- `GardenManager`: parcelas, semillas, plantado, riego, cosecha, desbloqueo de parcelas, inventario de semillas, decoraciones básicas y quests activas.
+- `GardenManager`: sistema principal de gameplay (parcelas, semillas, plantado, riego, cosecha, desbloqueo de parcelas, inventario de semillas, decoraciones básicas y quests activas).
 - `ProgressionManager`: `Level` y `XP`.
 - `HudController`: HUD de `Gold/Gems/Food/Level/XP`.
 - `GardenPlotPanel`: UI por parcela (estado, tiempo restante, acción principal).
 - `SeedShopPanel`: tienda mínima para comprar semillas desde UI.
 - `QuestListPanel`: muestra 1-2 pedidos/quests activos y progreso.
+- `DecorationPanel`: panel base para estado de decoraciones colocadas.
 - `IsometricCameraController`: cámara táctil isométrica (pan/zoom).
 
 ## Datos persistidos
@@ -45,6 +46,7 @@ Starter 2D isométrico enfocado en **garden sim** (sembrar -> crecer -> cosechar
 - Uno o más `GardenPlotPanel` (uno por `plotId`)
 - Panel `SeedShopPanel` enlazado a un catálogo de plantas
 - Panel `QuestListPanel` con 2 `TMP_Text` para quests activas
+- Panel `DecorationPanel` para estado de decoraciones
 - Cámara con `IsometricCameraController`
 
 ## TODOs próximos

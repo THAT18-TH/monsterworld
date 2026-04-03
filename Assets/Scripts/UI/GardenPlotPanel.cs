@@ -6,11 +6,15 @@ namespace MonsterWorldLike.UI
 {
     public class GardenPlotPanel : MonoBehaviour
     {
+        private const float RefreshIntervalSeconds = 0.25f;
+
         [SerializeField] private int plotId;
         [SerializeField] private PlantDefinition defaultPlant;
         [SerializeField] private TMP_Text stateText;
         [SerializeField] private TMP_Text timerText;
         [SerializeField] private TMP_Text actionText;
+
+        private float refreshTimer;
 
         private void OnEnable()
         {
@@ -28,11 +32,6 @@ namespace MonsterWorldLike.UI
             {
                 GardenManager.Instance.OnGardenChanged -= Refresh;
             }
-        }
-
-        private void Update()
-        {
-            Refresh();
         }
 
         public void Refresh()
@@ -85,6 +84,25 @@ namespace MonsterWorldLike.UI
                 if (timerText != null) timerText.text = $"{seconds}s";
                 if (actionText != null) actionText.text = "Esperando";
             }
+        }
+
+        private void Update()
+        {
+            var plot = GetPlot();
+            if (plot == null || !plot.unlocked || plot.IsEmpty || plot.needsWater)
+            {
+                refreshTimer = 0f;
+                return;
+            }
+
+            refreshTimer += Time.unscaledDeltaTime;
+            if (refreshTimer < RefreshIntervalSeconds)
+            {
+                return;
+            }
+
+            refreshTimer = 0f;
+            Refresh();
         }
 
         public void OnPrimaryActionPressed()
