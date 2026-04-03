@@ -53,6 +53,7 @@ namespace MonsterWorldLike.Garden
         [SerializeField, Min(1)] private int plotRows = 2;
         [SerializeField, Min(0.1f)] private float plotSpacingX = 1.1f;
         [SerializeField, Min(0.1f)] private float plotSpacingY = 0.8f;
+        [SerializeField] private bool debugPlotVisualLogs;
 
         [Header("Plants")]
         [SerializeField] private List<PlantDefinition> plantCatalog = new();
@@ -111,6 +112,7 @@ namespace MonsterWorldLike.Garden
 
             var root = plotRoot != null ? plotRoot : transform;
             var count = totalPlots;
+            var seenPlotIds = new HashSet<int>();
             for (var i = 0; i < count; i++)
             {
                 var col = i % Mathf.Max(1, plotColumns);
@@ -124,9 +126,9 @@ namespace MonsterWorldLike.Garden
                 plotVisuals.Add(plotVisual);
 
                 var plotId = i;
-                if (i < plots.Count && plots[i] != null)
+                if (!seenPlotIds.Add(plotId))
                 {
-                    plotId = plots[i].plotId;
+                    Debug.LogWarning($"GardenManager.RebuildPlotVisuals duplicate plotId detectado: {plotId}");
                 }
 
                 var controller = plotVisual.GetComponent<PlotVisualController>();
@@ -137,6 +139,10 @@ namespace MonsterWorldLike.Garden
 
                 controller.Bind(this, plotId);
                 plotVisualControllersById[plotId] = controller;
+                if (debugPlotVisualLogs)
+                {
+                    Debug.Log($"[GardenVisual] Bind visual '{plotVisual.name}' -> plotId={plotId} row={row} col={col}");
+                }
             }
         }
 

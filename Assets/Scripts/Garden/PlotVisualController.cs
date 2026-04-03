@@ -23,6 +23,7 @@ namespace MonsterWorldLike.Garden
         [SerializeField] private PlantDefinition defaultPlant;
         [SerializeField] private List<PlantVisualMapping> plantVisuals = new();
         [SerializeField] private GameObject fallbackCropPrefab;
+        [SerializeField] private bool debugLogs;
 
         [Header("State Colors")]
         [SerializeField] private Color lockedColor = new(0.35f, 0.35f, 0.35f, 1f);
@@ -36,11 +37,16 @@ namespace MonsterWorldLike.Garden
         private GardenManager manager;
         private Camera cachedCamera;
         private GameObject activeCropVisual;
+        private string activeCropPlantId;
 
         public void Bind(GardenManager gardenManager, int assignedPlotId)
         {
             manager = gardenManager;
             plotId = assignedPlotId;
+            if (debugLogs)
+            {
+                Debug.Log($"[PlotVisual] Bind object='{name}' plotId={plotId}");
+            }
             RefreshVisual();
         }
 
@@ -132,6 +138,17 @@ namespace MonsterWorldLike.Garden
                 return;
             }
 
+            if (debugLogs)
+            {
+                var nowDbg = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+                var state = !plot.unlocked ? "locked" :
+                    plot.withered ? "withered" :
+                    plot.IsEmpty ? "empty" :
+                    plot.needsWater ? "needs_water" :
+                    plot.IsReadyToHarvest(nowDbg) ? "ready" : "growing";
+                Debug.Log($"[PlotVisual] Refresh plotId={plotId} state={state} plantedSeedId={plot.plantedSeedId}");
+            }
+
             if (groundRenderer != null)
             {
                 var now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
@@ -194,6 +211,10 @@ namespace MonsterWorldLike.Garden
             else if (plot.IsEmpty)
             {
                 success = defaultPlant != null && manager.PlantSeed(plotId, defaultPlant);
+                if (debugLogs && success)
+                {
+                    Debug.Log($"[PlotVisual] Plant action success plotId={plotId} seed={defaultPlant.plantId}");
+                }
             }
             else
             {
@@ -215,6 +236,7 @@ namespace MonsterWorldLike.Garden
                 {
                     activeCropVisual.SetActive(false);
                 }
+                activeCropPlantId = null;
 
                 return;
             }
@@ -225,7 +247,7 @@ namespace MonsterWorldLike.Garden
                 return;
             }
 
-            if (activeCropVisual != null && activeCropVisual.name.StartsWith(prefab.name, StringComparison.Ordinal))
+            if (activeCropVisual != null && activeCropPlantId == plot.plantedSeedId)
             {
                 activeCropVisual.SetActive(true);
                 return;
@@ -234,6 +256,7 @@ namespace MonsterWorldLike.Garden
             if (activeCropVisual != null)
             {
                 Destroy(activeCropVisual);
+                activeCropPlantId = null;
             }
 
             var root = cropVisualRoot != null ? cropVisualRoot : transform;
@@ -241,6 +264,7 @@ namespace MonsterWorldLike.Garden
             activeCropVisual.transform.localPosition = Vector3.zero;
             activeCropVisual.transform.localRotation = Quaternion.identity;
             activeCropVisual.SetActive(true);
+            activeCropPlantId = plot.plantedSeedId;
         }
 
         private GameObject ResolveCropPrefab(string plantId)
