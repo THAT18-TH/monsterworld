@@ -15,11 +15,12 @@ namespace MonsterWorldLike.Garden
 
     public class PlotVisualController : MonoBehaviour
     {
+        [Header("References")]
         [SerializeField] private int plotId;
-        [SerializeField] private PlantDefinition defaultPlant;
         [SerializeField] private SpriteRenderer groundRenderer;
         [SerializeField] private Transform cropVisualRoot;
         [SerializeField] private Collider2D plotCollider2D;
+        [SerializeField] private PlantDefinition defaultPlant;
         [SerializeField] private List<PlantVisualMapping> plantVisuals = new();
         [SerializeField] private GameObject fallbackCropPrefab;
 
@@ -31,10 +32,10 @@ namespace MonsterWorldLike.Garden
         [SerializeField] private Color readyColor = new(0.55f, 1f, 0.55f, 1f);
         [SerializeField] private Color witheredColor = new(0.55f, 0.3f, 0.25f, 1f);
 
-        private readonly Dictionary<string, GameObject> plantPrefabById = new();
-        private GameObject currentCropVisual;
+        private readonly Dictionary<string, GameObject> plantPrefabsById = new();
         private GardenManager manager;
         private Camera cachedCamera;
+        private GameObject activeCropVisual;
 
         public void Bind(GardenManager gardenManager, int assignedPlotId)
         {
@@ -46,7 +47,6 @@ namespace MonsterWorldLike.Garden
         private void Awake()
         {
             cachedCamera = Camera.main;
-            RebuildPlantVisualLookup();
             if (groundRenderer == null)
             {
                 groundRenderer = GetComponentInChildren<SpriteRenderer>();
@@ -56,19 +56,24 @@ namespace MonsterWorldLike.Garden
             {
                 plotCollider2D = GetComponent<Collider2D>();
             }
+
+            RebuildPlantVisualLookup();
         }
 
         private void OnEnable()
         {
-            GardenManager.InstanceReady += OnGardenReady;
-            BindManagerEvents();
+            GardenManager.InstanceReady += OnGardenManagerReady;
+            RebindManagerEvents();
             RefreshVisual();
         }
 
         private void OnDisable()
         {
-            GardenManager.InstanceReady -= OnGardenReady;
-            UnbindManagerEvents();
+            GardenManager.InstanceReady -= OnGardenManagerReady;
+            if (manager != null)
+            {
+                manager.OnGardenChanged -= RefreshVisual;
+            }
         }
 
         private void Update()
@@ -90,19 +95,19 @@ namespace MonsterWorldLike.Garden
             }
 
             var cam = cachedCamera != null ? cachedCamera : Camera.main;
-            if (cam == null)
+            if (cam == null || plotCollider2D == null)
             {
                 return;
             }
 
-            var world = cam.ScreenToWorldPoint(touch.position);
-            var hit = Physics2D.Raycast(world, Vector2.zero);
+            var worldPoint = cam.ScreenToWorldPoint(touch.position);
+            var hit = Physics2D.Raycast(worldPoint, Vector2.zero);
             if (hit.collider == null || hit.collider != plotCollider2D)
             {
                 return;
             }
 
-            TryHandlePrimaryAction();
+            TryPrimaryAction();
         }
 
         private void OnMouseDown()
@@ -112,7 +117,7 @@ namespace MonsterWorldLike.Garden
                 return;
             }
 
-            TryHandlePrimaryAction();
+            TryPrimaryAction();
         }
 
         public void RefreshVisual()
@@ -146,46 +151,101 @@ namespace MonsterWorldLike.Garden
             RefreshCropVisual(plot);
         }
 
+        private void TryPrimaryAction()
+        {
+            if (manager == null)
+            {
+                manager = GardenManager.Instance;
+            }
+
+            if (manager == null)
+            {
+                return;
+            }
+
+            if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject())
+            {
+                return;
+            }
+
+            if (DecorationManager.Instance != null && DecorationManager.Instance.IsPlacementActive)
+            {
+                return;
+            }
+
+            if (!manager.TryGetPlot(plotId, out var plot))
+            {
+                return;
+            }
+
+            bool success;
+            if (!plot.unlocked)
+            {
+                success = manager.UnlockPlot(plotId);
+            }
+            else if (plot.withered)
+            {
+                success = manager.RevivePlot(plotId);
+            }
+            else if (plot.needsWater)
+            {
+                success = manager.Water(plotId);
+            }
+            else if (plot.IsEmpty)
+            {
+                success = defaultPlant != null && manager.PlantSeed(plotId, defaultPlant);
+            }
+            else
+            {
+                success = manager.Harvest(plotId);
+            }
+
+            if (success)
+            {
+                RefreshVisual();
+            }
+        }
+
         private void RefreshCropVisual(PlotState plot)
         {
-            var shouldShow = plot != null && plot.IsPlanted && !plot.withered;
-            if (!shouldShow)
+            var show = plot != null && plot.IsPlanted && !plot.withered;
+            if (!show)
             {
-                if (currentCropVisual != null)
+                if (activeCropVisual != null)
                 {
-                    currentCropVisual.SetActive(false);
+                    activeCropVisual.SetActive(false);
                 }
 
                 return;
             }
 
-            var desiredPrefab = ResolveCropPrefab(plot.plantedSeedId);
-            if (desiredPrefab == null)
+            var prefab = ResolveCropPrefab(plot.plantedSeedId);
+            if (prefab == null)
             {
                 return;
             }
 
-            if (currentCropVisual != null && currentCropVisual.name.StartsWith(desiredPrefab.name, StringComparison.Ordinal))
+            if (activeCropVisual != null && activeCropVisual.name.StartsWith(prefab.name, StringComparison.Ordinal))
             {
-                currentCropVisual.SetActive(true);
+                activeCropVisual.SetActive(true);
                 return;
             }
 
-            if (currentCropVisual != null)
+            if (activeCropVisual != null)
             {
-                Destroy(currentCropVisual);
+                Destroy(activeCropVisual);
             }
 
             var root = cropVisualRoot != null ? cropVisualRoot : transform;
-            currentCropVisual = Instantiate(desiredPrefab, root);
-            currentCropVisual.transform.localPosition = Vector3.zero;
-            currentCropVisual.transform.localRotation = Quaternion.identity;
-            currentCropVisual.SetActive(true);
+            activeCropVisual = Instantiate(prefab, root);
+            activeCropVisual.transform.localPosition = Vector3.zero;
+            activeCropVisual.transform.localRotation = Quaternion.identity;
+            activeCropVisual.SetActive(true);
         }
 
         private GameObject ResolveCropPrefab(string plantId)
         {
-            if (!string.IsNullOrWhiteSpace(plantId) && plantPrefabById.TryGetValue(plantId, out var prefab) && prefab != null)
+            if (!string.IsNullOrWhiteSpace(plantId) && plantPrefabsById.TryGetValue(plantId, out var prefab) && prefab != null)
             {
                 return prefab;
             }
@@ -193,37 +253,27 @@ namespace MonsterWorldLike.Garden
             return fallbackCropPrefab;
         }
 
-        private void TryHandlePrimaryAction()
+        private void RebuildPlantVisualLookup()
         {
-            if (manager == null)
+            plantPrefabsById.Clear();
+            foreach (var entry in plantVisuals)
             {
-                manager = GardenManager.Instance;
-            }
+                if (entry == null || string.IsNullOrWhiteSpace(entry.plantId) || entry.prefab == null)
+                {
+                    continue;
+                }
 
-            if (manager == null || IsPlacementInputBlocked())
-            {
-                return;
-            }
-
-            if (manager.TryPerformPrimaryAction(plotId, defaultPlant))
-            {
-                RefreshVisual();
+                plantPrefabsById[entry.plantId] = entry.prefab;
             }
         }
 
-        private static bool IsPlacementInputBlocked()
+        private void OnGardenManagerReady()
         {
-            return DecorationManager.Instance != null && DecorationManager.Instance.IsPlacementActive;
-        }
-
-        private void OnGardenReady()
-        {
-            manager = GardenManager.Instance;
-            BindManagerEvents();
+            RebindManagerEvents();
             RefreshVisual();
         }
 
-        private void BindManagerEvents()
+        private void RebindManagerEvents()
         {
             if (manager == null)
             {
@@ -234,28 +284,6 @@ namespace MonsterWorldLike.Garden
             {
                 manager.OnGardenChanged -= RefreshVisual;
                 manager.OnGardenChanged += RefreshVisual;
-            }
-        }
-
-        private void UnbindManagerEvents()
-        {
-            if (manager != null)
-            {
-                manager.OnGardenChanged -= RefreshVisual;
-            }
-        }
-
-        private void RebuildPlantVisualLookup()
-        {
-            plantPrefabById.Clear();
-            foreach (var entry in plantVisuals)
-            {
-                if (entry == null || string.IsNullOrWhiteSpace(entry.plantId) || entry.prefab == null)
-                {
-                    continue;
-                }
-
-                plantPrefabById[entry.plantId] = entry.prefab;
             }
         }
     }
